@@ -23,13 +23,13 @@ namespace {
 
   const std::string pp{"B.pbesol-n-kjpaw_psl.0.1.UPF"};
 
-  std::string pwx_scientific(double d) {
+  std::string pwx_fixed(double d) {
     std::ostringstream oss{};
     oss << std::fixed << std::setprecision(9) << d;
     return oss.str();
   }
 
-  std::string pwx_fixed(double d) {
+  std::string pwx_scientific(double d) {
     std::ostringstream oss{};
     oss << std::scientific << std::setprecision(9) << d;
     std::string s{oss.str()};
