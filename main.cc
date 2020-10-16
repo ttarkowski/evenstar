@@ -1,13 +1,16 @@
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <concepts>
 #include <cstddef>
-#include <initializer_list>
 #include <iomanip>
 #include <ios>
 #include <numbers>
 #include <fstream>
 #include <sstream>
+#include <tuple>
+#include <vector>
+#include <libbear/core/coordinates.h>
 #include <libbear/core/range.h>
 #include <libbear/core/system.h>
 #include <libbear/ea/elements.h>
@@ -91,10 +94,10 @@ namespace {
     std::string pp;
   };
   
-  std::string pwx_atomic_species(std::initializer_list<atom> l) {
+  std::string pwx_atomic_species(const std::vector<atom>& v) {
     std::ostringstream oss{};
     oss << "ATOMIC_SPECIES\n";
-    for (auto a : l) {
+    for (const auto& a : v) {
       oss << a.symbol << " " << pwx_fixed(a.mass) << " " << a.pp << "\n";
     }
     oss << "\n";
@@ -106,12 +109,15 @@ namespace {
     double x;
     double y;
     double z;
+    double distance(const position& p) const {
+      return std::hypot(x - p.x, y - p.y, z - p.z);
+    }
   };
 
-  std::string pwx_atomic_positions(std::initializer_list<position> l) {
+  std::string pwx_atomic_positions(const std::vector<position>& v) {
     std::ostringstream oss{};
     oss << "ATOMIC_POSITIONS angstrom\n";
-    for (auto p : l) {
+    for (auto p : v) {
       oss << p.symbol << " "
           << pwx_fixed(p.x) << " "
           << pwx_fixed(p.y) << " "
@@ -128,18 +134,75 @@ namespace {
     return oss.str();
   }
 
+  std::size_t number_of_atoms(const genotype& g) {
+    return 1 + g.size() / 3;
+  }
+
+  std::vector<position> adjust_positions(const std::vector<position>& v) {
+    std::vector<position> res{};
+    const auto min_x =
+      std::ranges::min_element(v, [](auto a, auto b) { return a.x < b.x; })->x;
+    const auto min_y =
+      std::ranges::min_element(v, [](auto a, auto b) { return a.y < b.y; })->y;
+    std::ranges::transform(v, std::back_inserter(res),
+                           [min_x, min_y](const position& p) {
+                             return position{p.symbol,
+                                             p.x - min_x, p.y - min_y, p.z};
+                           });
+    return res;
+  }
+
   template<std::floating_point T>
-  void input_file(const std::string& filename, T distance, T angle) {
+  std::tuple<std::vector<position>, double> geometry(const genotype& g) {
+    // n = number_of_atoms(g) i.e. number of atoms in unit cell:
+    // a) n > 0: dz_n
+    // b) n > 1: dz_n, rho_1, dz_1
+    // c) n > 2: dz_n, rho_1, dz_1, (rho_i, phi_i, dz_i) for i = 2, ..., n - 1
+    // Note: g.size() == 1 && n == 1 || g.size() == 3 * (n - 1) && n > 1
+    std::size_t i = 0;
+    const T dz_n = g.at(i++)->value<T>();
+    T z = 0.;
+    std::vector<position> res{position{"B11", 0., 0., z}};  // 0
+    if (number_of_atoms(g) > 1) {                           // 1
+      const auto [x, y] = polar2cart(g.at(i++)->value<T>(), 0.);
+      z += g.at(i++)->value<T>();
+      res.push_back(position{"B11", x, y, z});
+    }
+    while (i < g.size()) {                                  // 2, ..., n - 1
+      const auto rho = g.at(i++)->value<T>();
+      const auto [x, y] = polar2cart(rho, g.at(i++)->value<T>());
+      z += g.at(i++)->value<T>();
+      res.push_back(position{"B11", x, y, z});
+    }
+    assert(i == g.size() && res.size() == number_of_atoms(g));
+    return std::tuple<std::vector<position>, double>{adjust_positions(res),
+                                                     z + dz_n};
+  }
+
+  template<std::floating_point T>
+  std::vector<position> geometry_pbc(const genotype& g) {
+    auto [ps, h] = geometry<T>(g);
+    auto p = ps[0];
+    p.z += h;
+    ps.push_back(p);
+    return ps;
+  }
+
+  template<std::floating_point T>
+  void input_file(const std::string& filename, const genotype& g) {
     std::ofstream file{filename};
-    T dx = distance * std::sin(angle / 2.);
-    T dy = distance * std::cos(angle / 2.);
+    const auto [p, h] = geometry<T>(g);
+    const auto max_x =
+      std::ranges::max_element(p, [](auto a, auto b) { return a.x < b.x; })->x;
+    const auto max_y =
+      std::ranges::max_element(p, [](auto a, auto b) { return a.y < b.y; })->y;
     // With electron_maxstep == 25 about 5% of SCF calculations will not finish.
     file << pwx_control(filename)
-         << pwx_system(2, 1, 0., 5.e-3, 6.e+1)
+         << pwx_system(number_of_atoms(g), 1, 0., 5.e-3, 6.e+1)
          << pwx_electrons(25, 7.e-1)
-         << pwx_cell_parameters_diag(2 * dx, 15 + dy, 15)
+         << pwx_cell_parameters_diag(max_x + 15., max_y + 15., h)
          << pwx_atomic_species({{"B11", 11.009305, pp}})
-         << pwx_atomic_positions({{"B11", 0., 0., 0.}, {"B11", dx, dy, 0.}})
+         << pwx_atomic_positions(p)
          << pwx_k_points(4);
   }
 
@@ -157,27 +220,52 @@ int main() {
 
   execute("/bin/bash download.sh " + pp);
 
-  // function
-  const auto f = [](type distance, type angle) -> fitness {
+  const range<type> bond_range{0.5, 2.5}; // Angstrom
+  const range<type> rho_range{0., 2 * bond_range.max()};
+  const range<type> phi_range{0.,
+                              std::nextafter(2 * std::numbers::pi_v<type>, 0.)};
+  const range<type> dz_range{0., bond_range.max()};
+
+  const genotype g{gene{dz_range},  // dz_3
+                   gene{rho_range}, // rho_1
+                   gene{dz_range},  // dz_1
+                   gene{rho_range}, // rho_2
+                   gene{phi_range}, // phi_2
+                   gene{dz_range}}; // dz_2
+
+  const genotype_constraints cs = [bond_range](const genotype& g) -> bool {
+    // returns true for valid genotype
+    const auto ps = geometry_pbc<type>(g);
+    for (std::size_t i = 0; i < ps.size(); ++i) {
+      for (std::size_t j = i + 1; j < ps.size(); ++j) {
+        if (ps[i].distance(ps[j]) < bond_range.min()) {
+          return false;
+        }
+      }
+    }
+    for (std::size_t i = 0; i < ps.size(); ++i) {
+      bool res = false;
+      for (std::size_t j = 0; j < ps.size(); ++j) {
+        if (i != j && ps[i].distance(ps[j]) <= bond_range.max()) {
+          res = true;
+        }
+      }
+      if (!res) {
+        return res;
+      }
+    }
+    return true;
+  };
+
+  const auto f = [](const genotype& g) -> fitness {
     const std::string input_filename{unique_filename()};
-    input_file(input_filename, distance, angle);
+    input_file<type>(input_filename, g);
     const auto [o, e] = execute("/bin/bash calc.sh " + input_filename);
     return o == "Calculations failed.\n"? incalculable : -std::stod(o);
   };
-  // domain
-  const range<type> distance_range{0.5, 2.5}; // Angstrom
-  // Min angle can be calculated from this equation:
-  // 2 * distance * sin(angle / 2.) >= min bond length == 0.5
-  const range<type> angle_range{.25, std::numbers::pi_v<type>}; // rad
+  const fitness_function ff{f, cs};
 
-  const fitness_function ff{
-    [&](const genotype& g) {
-      return f(g[0]->value<type>(), g[1]->value<type>());
-    }
-  };
-
-  const auto first_generation_creator =
-    random_population{genotype{gene{distance_range}, gene{angle_range}}};
+  const auto first_generation_creator = random_population{g, cs};
   const auto parents_selection =
     roulette_wheel_selection{fitness_proportional_selection{ff}};
   const auto survivor_selection =
@@ -200,10 +288,12 @@ int main() {
   std::ofstream file{"evolution.dat"};
   for (std::size_t i = 0; const auto& x : e()) {
     for (const auto& xx : x) {
-      file << i << ' '
-           << xx[0]->value<type>() << ' '
-           << xx[1]->value<type>() << ' '
-           << ff(xx) << '\n';
+      file << i << ' ';
+      for (std::size_t i = 0; i < xx.size(); ++i) {
+        file << std::scientific << std::setprecision(9) << xx[i]->value<type>()
+             << ' ';
+      }
+      file << std::scientific << std::setprecision(9) << ff(xx) << '\n';
     }
     ++i;
   }
