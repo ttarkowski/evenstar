@@ -3,7 +3,7 @@ CXX        = g++-10
 CXXFLAGS   = -Wall -Wextra -pedantic -O3 -std=c++20 -fconcepts -g -ggdb -I../
 LDFLAGS    = -L../libbear/ -lbear
 TARGET     = evenstar
-SOURCES    = $(shell echo *.cc)
+SOURCES    = $(shell echo main.cc src/*.cc)
 OBJECTS    = $(SOURCES:.cc=.o)
 DEPENDENCY = $(OBJECTS:.o=.d)
 
