@@ -133,12 +133,14 @@ int main() {
   const pwx_atom atom{"B11", 11.009305, "B.pbesol-n-kjpaw_psl.0.1.UPF"};
   execute("/bin/bash download.sh " + atom.pp);
 
+  const std::size_t cell_atoms = 3;
   const range<type> bond_range{0.5, 2.5}; // Angstrom
-  const range<type> rho_range{0., 2 * bond_range.max()};
+  const range<type> rho_range{0., (cell_atoms - 1) * bond_range.max()};
   const range<type> phi_range{0.,
                               std::nextafter(2 * std::numbers::pi_v<type>, 0.)};
   const range<type> dz_range{0., bond_range.max()};
-  const genotype g{nanowire_genotype<type>(3, dz_range, rho_range, phi_range)};
+  const genotype g{nanowire_genotype<type>(cell_atoms,
+                                           dz_range, rho_range, phi_range)};
 
   const genotype_constraints cs = [=](const genotype& g) -> bool {
     // returns true for valid genotype
