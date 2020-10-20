@@ -29,6 +29,13 @@ namespace {
     return 1 + g.size() / 3;
   }
 
+  template<typename... Ts>
+  genotype append(const genotype& g, const gene<Ts>&... gs) {
+    genotype res{g};
+    (res.push_back(gs), ...);
+    return res;
+  }
+
   template<std::floating_point T>
   genotype nanowire_genotype(std::size_t n,
                              const range<T>& dz,
@@ -40,11 +47,8 @@ namespace {
     } else if (n == 2) {
       return genotype{gene{dz}, gene{rho}, gene{dz}};
     } else {
-      genotype res = nanowire_genotype<T>(n - 1, dz, rho, phi);
-      res.push_back<T>(gene{rho});
-      res.push_back<T>(gene{phi});
-      res.push_back<T>(gene{dz});
-      return res;
+      return append(nanowire_genotype<T>(n - 1, dz, rho, phi),
+                    gene{rho}, gene{phi}, gene{dz});
     }
   }
 
