@@ -42,14 +42,12 @@ namespace {
                              const range<T>& rho = range<T>{},
                              const range<T>& phi = range<T>{}) {
     assert(n > 0);
-    if (n == 1) {
-      return genotype{gene{dz}};
-    } else if (n == 2) {
-      return genotype{gene{dz}, gene{rho}, gene{dz}};
-    } else {
-      return append(nanowire_genotype<T>(n - 1, dz, rho, phi),
-                    gene{rho}, gene{phi}, gene{dz});
-    }
+    return n == 1
+      ? genotype{gene{dz}}
+      : n == 2
+        ? genotype{gene{dz}, gene{rho}, gene{dz}}
+        : append(nanowire_genotype<T>(n - 1, dz, rho, phi),
+                                      gene{rho}, gene{phi}, gene{dz});
   }
 
   pwx_positions
