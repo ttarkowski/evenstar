@@ -8,6 +8,7 @@
 #include <numbers>
 #include <fstream>
 #include <sstream>
+#include <ranges>
 #include <tuple>
 #include <libbear/core/coordinates.h>
 #include <libbear/core/range.h>
@@ -31,9 +32,9 @@ namespace {
 
   template<std::floating_point T>
   genotype nanowire(std::size_t n, const range<T>& bond) {
-    const range<type> rho{0., (cell_atoms - 1) * bond.max()};
-    const range<type> phi{0., std::nextafter(2 * std::numbers::pi_v<type>, 0.)};
-    const range<type> dz{0., bond.max()};
+    const range<T> rho{0., (n - 1) * bond.max()};
+    const range<T> phi{0., std::nextafter(2 * std::numbers::pi_v<T>, 0.)};
+    const range<T> dz{0., bond.max()};
     assert(n > 0);
     return n == 1
       ? genotype{gene{dz}}
@@ -134,9 +135,9 @@ int main() {
   const genotype_constraints cs = [=](const genotype& g) -> bool {
     // returns true for valid genotype
     const auto ps = geometry_pbc<type>(g, atom.symbol);
-    for (std::size_t i = 0; i < ps.size(); ++i) {
-      for (std::size_t j = i + 1; j < ps.size(); ++j) {
-        if (ps[i].distance(ps[j]) < bond_range.min()) {
+    for (std::size_t i = 0; const auto& x : ps) {
+      for (const auto& y : ps | std::views::drop(++i)) {
+        if (x.distance(y) < bond_range.min()) {
           return false;
         }
       }
