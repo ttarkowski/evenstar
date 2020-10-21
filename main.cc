@@ -121,6 +121,33 @@ namespace {
     return oss.str();
   }
 
+  template<std::floating_point T>
+  bool atoms_not_too_close(const pwx_positions& ps, T min_distance) {
+    for (std::size_t i = 0; const auto& x : ps) {
+      for (const auto& y : ps | std::views::drop(++i)) {
+        if (x.distance(y) < min_distance) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  template<std::floating_point T>
+  bool all_atoms_connected(const pwx_positions& ps, T max_distance) {
+    for (std::size_t i = 0; i < ps.size(); ++i) {
+      bool res = false;
+      for (std::size_t j = 0; j < ps.size(); ++j) {
+        if (i != j && ps[i].distance(ps[j]) <= max_distance) {
+          res = true;
+        }
+      }
+      if (!res) {
+        return res;
+      }
+    }
+    return true;
+  }
 }
 
 int main() {
@@ -133,27 +160,10 @@ int main() {
   const genotype g{nanowire<type>(cell_atoms, bond_range)};
 
   const genotype_constraints cs = [=](const genotype& g) -> bool {
-    // returns true for valid genotype
+    // Function returns true for valid genotype.
     const auto ps = geometry_pbc<type>(g, atom.symbol);
-    for (std::size_t i = 0; const auto& x : ps) {
-      for (const auto& y : ps | std::views::drop(++i)) {
-        if (x.distance(y) < bond_range.min()) {
-          return false;
-        }
-      }
-    }
-    for (std::size_t i = 0; i < ps.size(); ++i) {
-      bool res = false;
-      for (std::size_t j = 0; j < ps.size(); ++j) {
-        if (i != j && ps[i].distance(ps[j]) <= bond_range.max()) {
-          res = true;
-        }
-      }
-      if (!res) {
-        return res;
-      }
-    }
-    return true;
+    return atoms_not_too_close(ps, bond_range.min())
+           && all_atoms_connected(ps, bond_range.max());
   };
 
   const auto f = [atom](const genotype& g) -> fitness {
