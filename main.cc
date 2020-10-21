@@ -30,17 +30,16 @@ namespace {
   }
 
   template<std::floating_point T>
-  genotype nanowire_genotype(std::size_t n,
-                             const range<T>& dz,
-                             const range<T>& rho = range<T>{},
-                             const range<T>& phi = range<T>{}) {
+  genotype nanowire(std::size_t n, const range<T>& bond) {
+    const range<type> rho{0., (cell_atoms - 1) * bond.max()};
+    const range<type> phi{0., std::nextafter(2 * std::numbers::pi_v<type>, 0.)};
+    const range<type> dz{0., bond.max()};
     assert(n > 0);
     return n == 1
       ? genotype{gene{dz}}
       : n == 2
         ? genotype{gene{dz}, gene{rho}, gene{dz}}
-        : merge(nanowire_genotype<T>(n - 1, dz, rho, phi),
-                                     gene{rho}, gene{phi}, gene{dz});
+        : merge(nanowire<T>(n - 1, bond), gene{rho}, gene{phi}, gene{dz});
   }
 
   pwx_positions
@@ -130,12 +129,7 @@ int main() {
 
   const std::size_t cell_atoms = 3;
   const range<type> bond_range{0.5, 2.5}; // Angstrom
-  const range<type> rho_range{0., (cell_atoms - 1) * bond_range.max()};
-  const range<type> phi_range{0.,
-                              std::nextafter(2 * std::numbers::pi_v<type>, 0.)};
-  const range<type> dz_range{0., bond_range.max()};
-  const genotype g{nanowire_genotype<type>(cell_atoms,
-                                           dz_range, rho_range, phi_range)};
+  const genotype g{nanowire<type>(cell_atoms, bond_range)};
 
   const genotype_constraints cs = [=](const genotype& g) -> bool {
     // returns true for valid genotype
