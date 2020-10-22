@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace evenstar {
@@ -22,6 +23,10 @@ namespace evenstar {
     double distance(const pwx_position& p) const
     { return std::hypot(x - p.x, y - p.y, z - p.z); }
   };
+
+  inline double pwx_distance(const std::tuple<pwx_position, pwx_position> t) {
+    return std::get<0>(t).distance(std::get<1>(t));
+  }
 
   using pwx_atoms = std::vector<pwx_atom>;
   using pwx_positions = std::vector<pwx_position>;
