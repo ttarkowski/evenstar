@@ -121,33 +121,41 @@ namespace {
     return oss.str();
   }
 
-  template<std::floating_point T>
-  bool atoms_not_too_close(const pwx_positions& ps, T min_distance) {
-    for (std::size_t i = 0; const auto& x : ps) {
-      for (const auto& y : ps | std::views::drop(++i)) {
-        if (x.distance(y) < min_distance) {
-          return false;
-        }
+  // Mystic Rose is a complete graph with vertices placed on the points of
+  // a regular polygon. This function returns edges needed to construct this
+  // graph, e.g. for (0, 1, 2) it returns ((0, 1), (0, 2), (1, 2)).
+  template<typename T, template<typename> typename C>
+  std::vector<std::tuple<T, T>> mystic_rose_edges(const C<T>& c) {
+    std::vector<std::tuple<T, T>> res;
+    for (std::size_t i = 0; const auto& x : c) {
+      for (const auto& y : c | std::views::drop(++i)) {
+        res.push_back(std::make_tuple(x, y));
       }
     }
-    return true;
+    return res;
+  }
+
+  template<std::floating_point T>
+  bool atoms_not_too_close(const pwx_positions& ps, T min_distance) {
+    return std::ranges::all_of(mystic_rose_edges(ps),
+                               [=](const auto& t) {
+                                 return pwx_distance(t) > min_distance;
+                               });
   }
 
   template<std::floating_point T>
   bool all_atoms_connected(const pwx_positions& ps, T max_distance) {
-    for (std::size_t i = 0; i < ps.size(); ++i) {
-      bool res = false;
-      for (std::size_t j = 0; j < ps.size(); ++j) {
-        if (i != j && ps[i].distance(ps[j]) <= max_distance) {
-          res = true;
-        }
-      }
-      if (!res) {
-        return res;
-      }
-    }
-    return true;
+    return std::ranges::
+      all_of(ps,
+             [&ps, max_distance](const auto& x) {
+               return std::ranges::
+                 any_of(ps | std::views::filter(x.different()),
+                        [&x, max_distance](const auto& y) {
+                          return x.distance(y) <= max_distance;
+                        });
+             });
   }
+
 }
 
 int main() {
