@@ -20,6 +20,11 @@ namespace evenstar {
     double y;
     double z;
 
+    bool operator==(const pwx_position&) const = default;
+
+    auto different() const
+    { return [q = *this](const pwx_position& p) { return p != q; }; }
+
     double distance(const pwx_position& p) const
     { return std::hypot(x - p.x, y - p.y, z - p.z); }
   };
