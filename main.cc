@@ -135,10 +135,9 @@ namespace {
 
   template<std::floating_point T>
   bool atoms_not_too_close(const pwx_positions& ps, T min_distance) {
-    return std::ranges::all_of(mystic_rose_edges(ps),
-                               [=](const auto& t) {
-                                 return pwx_distance(t) > min_distance;
-                               });
+    return std::ranges::
+      all_of(mystic_rose_edges(ps),
+             [=](const auto& t) { return pwx_distance(t) > min_distance; });
   }
 
   template<std::floating_point T>
