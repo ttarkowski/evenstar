@@ -46,8 +46,8 @@ namespace {
   pwx_positions
   adjust_positions(const pwx_positions& ps) {
     pwx_positions res{};
-    const auto min_x = std::ranges::min_element(ps, less_x)->x;
-    const auto min_y = std::ranges::min_element(ps, less_y)->y;
+    const auto min_x = std::ranges::min_element(ps, less<'x'>)->x;
+    const auto min_y = std::ranges::min_element(ps, less<'y'>)->y;
     std::ranges::transform(ps, std::back_inserter(res),
                            [min_x, min_y](const pwx_position& p) {
                              return pwx_position{p.symbol,
@@ -96,8 +96,8 @@ namespace {
                   const pwx_atom& atom) {
     std::ofstream file{filename};
     const auto [p, h] = geometry<T>(g, atom.symbol);
-    const auto max_x = std::ranges::max_element(p, less_x)->x;
-    const auto max_y = std::ranges::max_element(p, less_y)->y;
+    const auto max_x = std::ranges::max_element(p, less<'x'>)->x;
+    const auto max_y = std::ranges::max_element(p, less<'y'>)->y;
     // With electron_maxstep == 25 about 5% of SCF calculations will not finish.
     file << pwx_control(filename)
          << pwx_system(number_of_atoms(g), 1, 0., 5.e-3, 6.e+1)
