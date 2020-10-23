@@ -33,6 +33,12 @@ namespace evenstar {
     return std::get<0>(t).distance(std::get<1>(t));
   }
 
+  inline bool less_x(const pwx_position& p0, const pwx_position& p1)
+  { return p0.x < p1.x; }
+
+  inline bool less_y(const pwx_position& p0, const pwx_position& p1)
+  { return p0.y < p1.y; }
+
   using pwx_atoms = std::vector<pwx_atom>;
   using pwx_positions = std::vector<pwx_position>;
 
