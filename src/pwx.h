@@ -33,10 +33,6 @@ namespace evenstar {
     return std::get<0>(t).distance(std::get<1>(t));
   }
 
-  template<char C>
-  bool less(const pwx_position& p0, const pwx_position& p1)
-  { return C == 'x'? p0.x < p1.x : C == 'y'? p0.y < p1.y : p0.z < p1.z; }
-
   using pwx_atoms = std::vector<pwx_atom>;
   using pwx_positions = std::vector<pwx_position>;
 
