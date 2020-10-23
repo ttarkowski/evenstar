@@ -88,9 +88,7 @@ namespace {
   template<std::floating_point T>
   pwx_positions geometry_pbc(const genotype& g, const std::string& atom_symbol) {
     auto [ps, h] = geometry<T>(g, atom_symbol);
-    auto p = ps[0];
-    p.z += h;
-    ps.push_back(p);
+    ps.push_back(pwx_position{ps[0].symbol, ps[0].x, ps[0].y, ps[0].z + h});
     return ps;
   }
 
