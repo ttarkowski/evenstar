@@ -1,3 +1,4 @@
+#include <atomic>
 #include <iomanip>
 #include <ios>
 #include <sstream>
@@ -111,6 +112,15 @@ pwx_k_points(int k) {
   std::ostringstream oss{};
   oss << "K_POINTS automatic\n"
       << k << " 1 1 1 1 0\n";
+  return oss.str();
+}
+
+std::string
+evenstar::
+pwx_unique_filename() {
+  static std::atomic_size_t i{0};
+  std::ostringstream oss{};
+  oss << "stripe-" << i++ << ".in";
   return oss.str();
 }
 

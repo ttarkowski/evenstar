@@ -51,6 +51,8 @@ namespace evenstar {
   std::string pwx_atomic_positions(const pwx_positions& ps);
   std::string pwx_k_points(int k);
 
+  std::string pwx_unique_filename();
+
 } // namespace evenstar
 
 #endif // EVENSTAR_SRC_PWX_H

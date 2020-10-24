@@ -1,15 +1,9 @@
 #include <algorithm>
-#include <atomic>
-#include <cmath>
 #include <concepts>
 #include <cstddef>
 #include <iomanip>
 #include <ios>
-#include <numbers>
 #include <fstream>
-#include <sstream>
-#include <ranges>
-#include <tuple>
 #include <libbear/core/coordinates.h>
 #include <libbear/core/range.h>
 #include <libbear/core/system.h>
@@ -19,76 +13,13 @@
 #include <libbear/ea/genotype.h>
 #include <libbear/ea/population.h>
 #include <libbear/ea/variation.h>
+#include "src/nanowire.h"
 #include "src/pwx.h"
 
 using namespace libbear;
 using namespace evenstar;
 
 namespace {
-
-  std::size_t number_of_atoms(const genotype& g) {
-    return 1 + g.size() / 3;
-  }
-
-  template<std::floating_point T>
-  genotype nanowire(std::size_t n, const range<T>& bond) {
-    const range<T> rho{0., (n - 1) * bond.max()};
-    const range<T> phi{0., std::nextafter(2 * std::numbers::pi_v<T>, 0.)};
-    const range<T> dz{0., bond.max()};
-    assert(n > 0);
-    return n == 1
-      ? genotype{gene{dz}}
-      : n == 2
-        ? genotype{gene{dz}, gene{rho}, gene{dz}}
-        : merge(nanowire<T>(n - 1, bond), gene{rho}, gene{phi}, gene{dz});
-  }
-
-  pwx_positions
-  adjust_positions(const pwx_positions& ps) {
-    pwx_positions res{};
-    const auto min_x = std::ranges::min_element(ps, {}, &pwx_position::x)->x;
-    const auto min_y = std::ranges::min_element(ps, {}, &pwx_position::y)->y;
-    std::ranges::transform(ps, std::back_inserter(res),
-                           [min_x, min_y](const pwx_position& p) {
-                             return pwx_position{p.symbol,
-                                                 p.x - min_x, p.y - min_y, p.z};
-                           });
-    return res;
-  }
-
-  template<std::floating_point T>
-  std::tuple<pwx_positions, double> geometry(const genotype& g,
-                                             const std::string& atom_symbol) {
-    // n = number_of_atoms(g) i.e. number of atoms in unit cell:
-    // a) n > 0: dz_n
-    // b) n > 1: dz_n, rho_1, dz_1
-    // c) n > 2: dz_n, rho_1, dz_1, (rho_i, phi_i, dz_i) for i = 2, ..., n - 1
-    // Note: g.size() == 1 && n == 1 || g.size() == 3 * (n - 1) && n > 1
-    std::size_t i = 0;
-    const T dz_n = g.at(i++)->value<T>();
-    T z = 0.;
-    pwx_positions res{pwx_position{atom_symbol, 0., 0., z}}; // 0
-    if (number_of_atoms(g) > 1) { // 1
-      const auto [x, y] = polar2cart(g.at(i++)->value<T>(), 0.);
-      z += g.at(i++)->value<T>();
-      res.push_back(pwx_position{atom_symbol, x, y, z});
-    }
-    while (i < g.size()) { // 2, ..., n - 1
-      const auto rho = g.at(i++)->value<T>();
-      const auto [x, y] = polar2cart(rho, g.at(i++)->value<T>());
-      z += g.at(i++)->value<T>();
-      res.push_back(pwx_position{atom_symbol, x, y, z});
-    }
-    assert(i == g.size() && res.size() == number_of_atoms(g));
-    return std::tuple<pwx_positions, double>{adjust_positions(res), z + dz_n};
-  }
-
-  template<std::floating_point T>
-  pwx_positions geometry_pbc(const genotype& g, const std::string& atom_symbol) {
-    auto [ps, h] = geometry<T>(g, atom_symbol);
-    ps.push_back(pwx_position{ps[0].symbol, ps[0].x, ps[0].y, ps[0].z + h});
-    return ps;
-  }
 
   template<std::floating_point T>
   void input_file(const std::string& filename,
@@ -106,47 +37,6 @@ namespace {
          << pwx_atomic_species({atom})
          << pwx_atomic_positions(p)
          << pwx_k_points(4);
-  }
-
-  std::string unique_filename() {
-    static std::atomic_size_t i{0};
-    std::ostringstream oss{};
-    oss << "stripe-" << i++ << ".in";
-    return oss.str();
-  }
-
-  // Mystic Rose is a complete graph with vertices placed on the points of
-  // a regular polygon. This function returns edges needed to construct this
-  // graph, e.g. for (0, 1, 2) it returns ((0, 1), (0, 2), (1, 2)).
-  template<typename T, template<typename> typename C>
-  std::vector<std::tuple<T, T>> mystic_rose_edges(const C<T>& c) {
-    std::vector<std::tuple<T, T>> res;
-    for (std::size_t i = 0; const auto& x : c) {
-      for (const auto& y : c | std::views::drop(++i)) {
-        res.push_back(std::make_tuple(x, y));
-      }
-    }
-    return res;
-  }
-
-  template<std::floating_point T>
-  bool atoms_not_too_close(const pwx_positions& ps, T min_distance) {
-    return std::ranges::
-      all_of(mystic_rose_edges(ps),
-             [=](const auto& t) { return pwx_distance(t) > min_distance; });
-  }
-
-  template<std::floating_point T>
-  bool all_atoms_connected(const pwx_positions& ps, T max_distance) {
-    return std::ranges::
-      all_of(ps,
-             [&ps, max_distance](const auto& x) {
-               return std::ranges::
-                 any_of(ps | std::views::filter(x.different()),
-                        [&x, max_distance](const auto& y) {
-                          return x.distance(y) <= max_distance;
-                        });
-             });
   }
 
 }
@@ -168,7 +58,7 @@ int main() {
   };
 
   const auto f = [atom](const genotype& g) -> fitness {
-    const std::string input_filename{unique_filename()};
+    const std::string input_filename{pwx_unique_filename()};
     input_file<type>(input_filename, g, atom);
     const auto [o, e] = execute("/bin/bash calc.sh " + input_filename);
     return o == "Calculations failed.\n"? incalculable : -std::stod(o);
