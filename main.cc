@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <ios>
 #include <fstream>
+#include <unordered_map>
 #include <libbear/core/coordinates.h>
 #include <libbear/core/range.h>
 #include <libbear/core/system.h>
@@ -21,10 +22,13 @@ using namespace evenstar;
 
 namespace {
 
+  std::unordered_map<genotype, std::string> file_db{};
+
   template<std::floating_point T>
   void input_file(const std::string& filename,
                   const genotype& g,
                   const pwx_atom& atom) {
+    file_db[g] = filename;
     std::ofstream file{filename};
     const auto [p, h] = geometry<T>(g, atom.symbol);
     const auto max_x = std::ranges::max_element(p, {}, &pwx_position::x)->x;
@@ -93,7 +97,8 @@ int main() {
         file << std::scientific << std::setprecision(9) << xx[i]->value<type>()
              << ' ';
       }
-      file << std::scientific << std::setprecision(9) << ff(xx) << '\n';
+      file << std::scientific << std::setprecision(9) << ff(xx) << ' '
+           << file_db[g] << '\n';
     }
     ++i;
   }
