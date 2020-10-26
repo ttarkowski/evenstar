@@ -98,7 +98,7 @@ int main() {
              << ' ';
       }
       file << std::scientific << std::setprecision(9) << ff(xx) << ' '
-           << file_db[g] << '\n';
+           << file_db[xx] << '\n';
     }
     ++i;
   }
