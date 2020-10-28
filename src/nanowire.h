@@ -17,24 +17,48 @@
 
 namespace evenstar {
 
-  inline std::size_t number_of_atoms(const libbear::genotype& g)
-  { return 1 + g.size() / 3; }
+  inline std::size_t number_of_atoms(const libbear::genotype& g, bool flat)
+  { return flat? (1 + g.size()) / 2 : 1 + g.size() / 3; }
+
+  namespace detail {
+
+    template<std::floating_point T>
+    libbear::genotype
+    nanowire_flat(std::size_t n, const libbear::range<T>& bond) {
+      const libbear::range<T> y{-(n - 1) * bond.max(), (n + 1) * bond.max()};
+      const libbear::range<T> dz{0., bond.max()};
+      return n == 1
+        ? libbear::genotype{libbear::gene{dz}}
+        : merge(nanowire_flat<T>(n - 1, bond),
+                libbear::gene{y}, libbear::gene{dz});
+    }
+
+    template<std::floating_point T>
+    libbear::genotype
+    nanowire_buckled(std::size_t n, const libbear::range<T>& bond) {
+      const libbear::range<T> rho{0., (n - 1) * bond.max()};
+      const libbear::range<T> phi{0.,
+                                  std::nextafter(2 * std::numbers::pi_v<T>, 0.)};
+      const libbear::range<T> dz{0., bond.max()};
+      return n == 1
+        ? libbear::genotype{libbear::gene{dz}}
+        : n == 2
+          ? libbear::genotype{libbear::gene{dz},
+                              libbear::gene{rho},
+                              libbear::gene{dz}}
+          : merge(nanowire_buckled<T>(n - 1, bond),
+                  libbear::gene{rho}, libbear::gene{phi}, libbear::gene{dz});
+    }
+
+  } // namespace detail
 
   template<std::floating_point T>
-  libbear::genotype nanowire(std::size_t n, const libbear::range<T>& bond) {
-    const libbear::range<T> rho{0., (n - 1) * bond.max()};
-    const libbear::range<T> phi{0.,
-                                std::nextafter(2 * std::numbers::pi_v<T>, 0.)};
-    const libbear::range<T> dz{0., bond.max()};
+  libbear::genotype
+  nanowire(std::size_t n, const libbear::range<T>& bond, bool flat) {
     assert(n > 0);
-    return n == 1
-      ? libbear::genotype{libbear::gene{dz}}
-      : n == 2
-        ? libbear::genotype{libbear::gene{dz},
-                            libbear::gene{rho},
-                            libbear::gene{dz}}
-        : merge(nanowire<T>(n - 1, bond),
-                libbear::gene{rho}, libbear::gene{phi}, libbear::gene{dz});
+    return flat
+      ? detail::nanowire_flat<T>(n, bond)
+      : detail::nanowire_buckled<T>(n, bond);
   }
 
   namespace detail {
@@ -77,37 +101,74 @@ namespace evenstar {
 
   pwx_positions adjust_positions(const pwx_positions& ps);
 
+  namespace detail {
+
+    template<std::floating_point T>
+    std::tuple<pwx_positions, double>
+    geometry_flat(const libbear::genotype& g,
+                  const std::string& atom_symbol) {
+      // n = number_of_atoms(g) i.e. number of atoms in unit cell:
+      // a) n > 0: dz_n
+      // b) n > 1: dz_n, (y_i, dz_i) for i = 1, ..., n - 1
+      // Note: g.size() == 2 * n - 1
+      std::size_t i = 0;
+      const T dz_n = g.at(i++)->value<T>();
+      T z = 0.;
+      pwx_positions res{pwx_position{atom_symbol, 0., 0., z}}; // 0
+      while (i < g.size()) { // 1, ..., n - 1
+        const auto y = g.at(i++)->value<T>();
+        z += g.at(i++)->value<T>();
+        res.push_back(pwx_position{atom_symbol, 0., y, z});
+      }
+      assert(i == g.size() && res.size() == number_of_atoms(g, true));
+      return std::tuple<pwx_positions, double>{adjust_positions(res), z + dz_n};
+    }
+
+    template<std::floating_point T>
+    std::tuple<pwx_positions, double>
+    geometry_buckled(const libbear::genotype& g,
+                     const std::string& atom_symbol) {
+      // n = number_of_atoms(g) i.e. number of atoms in unit cell:
+      // a) n > 0: dz_n
+      // b) n > 1: dz_n, rho_1, dz_1
+      // c) n > 2: dz_n, rho_1, dz_1, (rho_i, phi_i, dz_i) for i = 2, ..., n - 1
+      // Note: g.size() == 1 && n == 1 || g.size() == 3 * (n - 1) && n > 1
+      std::size_t i = 0;
+      const T dz_n = g.at(i++)->value<T>();
+      T z = 0.;
+      pwx_positions res{pwx_position{atom_symbol, 0., 0., z}}; // 0
+      if (number_of_atoms(g, false) > 1) { // 1
+        const auto [x, y] = libbear::polar2cart(g.at(i++)->value<T>(), 0.);
+        z += g.at(i++)->value<T>();
+        res.push_back(pwx_position{atom_symbol, x, y, z});
+      }
+      while (i < g.size()) { // 2, ..., n - 1
+        const auto rho = g.at(i++)->value<T>();
+        const auto [x, y] = libbear::polar2cart(rho, g.at(i++)->value<T>());
+        z += g.at(i++)->value<T>();
+        res.push_back(pwx_position{atom_symbol, x, y, z});
+      }
+      assert(i == g.size() && res.size() == number_of_atoms(g, false));
+      return std::tuple<pwx_positions, double>{adjust_positions(res), z + dz_n};
+    }
+
+  } // namespace detail
+
   template<std::floating_point T>
-  std::tuple<pwx_positions, double> geometry(const libbear::genotype& g,
-                                             const std::string& atom_symbol) {
-    // n = number_of_atoms(g) i.e. number of atoms in unit cell:
-    // a) n > 0: dz_n
-    // b) n > 1: dz_n, rho_1, dz_1
-    // c) n > 2: dz_n, rho_1, dz_1, (rho_i, phi_i, dz_i) for i = 2, ..., n - 1
-    // Note: g.size() == 1 && n == 1 || g.size() == 3 * (n - 1) && n > 1
-    std::size_t i = 0;
-    const T dz_n = g.at(i++)->value<T>();
-    T z = 0.;
-    pwx_positions res{pwx_position{atom_symbol, 0., 0., z}}; // 0
-    if (number_of_atoms(g) > 1) { // 1
-      const auto [x, y] = libbear::polar2cart(g.at(i++)->value<T>(), 0.);
-      z += g.at(i++)->value<T>();
-      res.push_back(pwx_position{atom_symbol, x, y, z});
-    }
-    while (i < g.size()) { // 2, ..., n - 1
-      const auto rho = g.at(i++)->value<T>();
-      const auto [x, y] = libbear::polar2cart(rho, g.at(i++)->value<T>());
-      z += g.at(i++)->value<T>();
-      res.push_back(pwx_position{atom_symbol, x, y, z});
-    }
-    assert(i == g.size() && res.size() == number_of_atoms(g));
-    return std::tuple<pwx_positions, double>{adjust_positions(res), z + dz_n};
+  std::tuple<pwx_positions, double>
+  geometry(const libbear::genotype& g,
+           const std::string& atom_symbol,
+           bool flat) {
+    return flat
+      ? detail::geometry_flat<T>(g, atom_symbol)
+      : detail::geometry_buckled<T>(g, atom_symbol);
   }
 
   template<std::floating_point T>
   pwx_positions geometry_pbc(const libbear::genotype& g,
-                             const std::string& atom_symbol) {
-    auto [ps, h] = geometry<T>(g, atom_symbol);
+                             const std::string& atom_symbol,
+                             bool flat) {
+    auto [ps, h] = geometry<T>(g, atom_symbol, flat);
     ps.push_back(pwx_position{ps[0].symbol, ps[0].x, ps[0].y, ps[0].z + h});
     return ps;
   }

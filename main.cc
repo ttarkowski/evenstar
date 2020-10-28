@@ -27,15 +27,16 @@ namespace {
   template<std::floating_point T>
   void input_file(const std::string& filename,
                   const genotype& g,
-                  const pwx_atom& atom) {
+                  const pwx_atom& atom,
+                  bool flat) {
     file_db[g] = filename;
     std::ofstream file{filename};
-    const auto [p, h] = geometry<T>(g, atom.symbol);
+    const auto [p, h] = geometry<T>(g, atom.symbol, flat);
     const auto max_x = std::ranges::max_element(p, {}, &pwx_position::x)->x;
     const auto max_y = std::ranges::max_element(p, {}, &pwx_position::y)->y;
     // With electron_maxstep == 25 about 5% of SCF calculations will not finish.
     file << pwx_control(filename)
-         << pwx_system(number_of_atoms(g), 1, 0., 5.e-3, 6.e+1)
+         << pwx_system(number_of_atoms(g, flat), 1, 0., 5.e-3, 6.e+1)
          << pwx_electrons(25, 7.e-1)
          << pwx_cell_parameters_diag(max_x + 15., max_y + 15., h)
          << pwx_atomic_species({atom})
@@ -50,20 +51,21 @@ int main() {
   const pwx_atom atom{"B11", 11.009305, "B.pbesol-n-kjpaw_psl.0.1.UPF"};
   execute("/bin/bash download.sh " + atom.pp);
 
+  const bool flat = true;
   const std::size_t cell_atoms = 3;
   const range<type> bond_range{0.5, 2.5}; // Angstrom
-  const genotype g{nanowire<type>(cell_atoms, bond_range)};
+  const genotype g{nanowire<type>(cell_atoms, bond_range, flat)};
 
   const genotype_constraints cs = [=](const genotype& g) -> bool {
     // Function returns true for valid genotype.
-    const auto ps = geometry_pbc<type>(g, atom.symbol);
+    const auto ps = geometry_pbc<type>(g, atom.symbol, flat);
     return atoms_not_too_close(ps, bond_range.min())
            && all_atoms_connected(ps, bond_range.max());
   };
 
   const auto f = [atom](const genotype& g) -> fitness {
     const std::string input_filename{pwx_unique_filename()};
-    input_file<type>(input_filename, g, atom);
+    input_file<type>(input_filename, g, atom, flat);
     const auto [o, e] = execute("/bin/bash calc.sh " + input_filename);
     return o == "Calculations failed.\n"? incalculable : -std::stod(o);
   };
@@ -93,8 +95,8 @@ int main() {
   for (std::size_t i = 0; const auto& x : e()) {
     for (const auto& xx : x) {
       file << i << ' ';
-      for (std::size_t i = 0; i < xx.size(); ++i) {
-        file << std::scientific << std::setprecision(9) << xx[i]->value<type>()
+      for (std::size_t j = 0; j < xx.size(); ++i) {
+        file << std::scientific << std::setprecision(9) << xx[j]->value<type>()
              << ' ';
       }
       file << std::scientific << std::setprecision(9) << ff(xx) << ' '
