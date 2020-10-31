@@ -79,6 +79,7 @@ namespace evenstar {
 
   } // namespace detail
 
+  // This function template checks if all atoms are separated from each other.
   template<std::floating_point T>
   bool atoms_not_too_close(const pwx_positions& ps, T min_distance) {
     return std::ranges::
@@ -86,8 +87,9 @@ namespace evenstar {
              [=](const auto& t) { return pwx_distance(t) > min_distance; });
   }
 
+  // This function template checks if every atom has at least one neighbor.
   template<std::floating_point T>
-  bool all_atoms_connected(const pwx_positions& ps, T max_distance) {
+  bool atoms_not_alone(const pwx_positions& ps, T max_distance) {
     return std::ranges::
       all_of(ps,
              [&ps, max_distance](const auto& x) {
@@ -97,6 +99,24 @@ namespace evenstar {
                           return x.distance(y) <= max_distance;
                         });
              });
+  }
+
+  // This function template checks if all atoms are connected, i.e. form a wire.
+  template<std::floating_point T>
+  bool all_atoms_connected(const pwx_positions& ps, T max_distance) {
+    pwx_positions connected{};
+    for (const auto& x : ps) {
+      if (std::ranges::any_of(connected,
+                              [&x, max_distance](const auto& y) {
+                                return x.distance(y) <= max_distance;
+                              }) || connected.size() == 0) {
+        connected.push_back(x);
+      } else {
+        return false;
+      }
+    }
+    assert(connected.size() == ps.size());
+    return true;
   }
 
   pwx_positions adjust_positions(const pwx_positions& ps);
