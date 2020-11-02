@@ -95,7 +95,7 @@ int main() {
   for (std::size_t i = 0; const auto& x : e()) {
     for (const auto& xx : x) {
       file << i << ' ';
-      for (std::size_t j = 0; j < xx.size(); ++i) {
+      for (std::size_t j = 0; j < xx.size(); ++j) {
         file << std::scientific << std::setprecision(9) << xx[j]->value<type>()
              << ' ';
       }
