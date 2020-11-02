@@ -25,12 +25,13 @@ namespace evenstar {
     template<std::floating_point T>
     libbear::genotype
     nanowire_flat(std::size_t n, const libbear::range<T>& bond) {
-      const libbear::range<T> y{-(n - 1) * bond.max(), (n + 1) * bond.max()};
+      const libbear::range<T> y{-(n - 1) * bond.max(), (n - 1) * bond.max()};
       const libbear::range<T> dz{0., bond.max()};
-      return n == 1
-        ? libbear::genotype{libbear::gene{dz}}
-        : merge(nanowire_flat<T>(n - 1, bond),
-                libbear::gene{y}, libbear::gene{dz});
+      libbear::genotype res{libbear::gene{dz}};
+      for (std::size_t i = 1; i < n; ++i) {
+        res = libbear::merge(res, libbear::gene{y}, libbear::gene{dz});
+      }
+      return res;
     }
 
     template<std::floating_point T>
@@ -40,14 +41,15 @@ namespace evenstar {
       const libbear::range<T> phi{0.,
                                   std::nextafter(2 * std::numbers::pi_v<T>, 0.)};
       const libbear::range<T> dz{0., bond.max()};
-      return n == 1
-        ? libbear::genotype{libbear::gene{dz}}
-        : n == 2
-          ? libbear::genotype{libbear::gene{dz},
-                              libbear::gene{rho},
-                              libbear::gene{dz}}
-          : merge(nanowire_buckled<T>(n - 1, bond),
-                  libbear::gene{rho}, libbear::gene{phi}, libbear::gene{dz});
+      libbear::genotype res{libbear::gene{dz}};
+      if (n > 1) {
+        res = libbear::merge(res, libbear::gene{rho}, libbear::gene{dz});
+      }
+      for (std::size_t i = 2; i < n; ++i) {
+        res = libbear::merge(res,
+          libbear::gene{rho}, libbear::gene{phi}, libbear::gene{dz});
+      }
+      return res;
     }
 
   } // namespace detail
@@ -56,9 +58,11 @@ namespace evenstar {
   libbear::genotype
   nanowire(std::size_t n, const libbear::range<T>& bond, bool flat) {
     assert(n > 0);
-    return flat
+    const libbear::genotype res{flat
       ? detail::nanowire_flat<T>(n, bond)
-      : detail::nanowire_buckled<T>(n, bond);
+      : detail::nanowire_buckled<T>(n, bond)};
+    assert(n == number_of_atoms(res, flat));
+    return res;
   }
 
   namespace detail {

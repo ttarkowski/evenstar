@@ -51,7 +51,7 @@ int main() {
   const pwx_atom atom{"B11", 11.009305, "B.pbesol-n-kjpaw_psl.0.1.UPF"};
   execute("/bin/bash download.sh " + atom.pp);
 
-  const bool flat = true;
+  const bool flat = false;
   const std::size_t cell_atoms = 3;
   const range<type> bond_range{0.5, 2.5}; // Angstrom
   const genotype g{nanowire<type>(cell_atoms, bond_range, flat)};
