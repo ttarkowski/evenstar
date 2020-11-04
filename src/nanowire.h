@@ -25,7 +25,8 @@ namespace evenstar {
     template<std::floating_point T>
     libbear::genotype
     nanowire_flat(std::size_t n, const libbear::range<T>& bond) {
-      const libbear::range<T> y{-(T{n} - 1) * bond.max(), (n - 1) * bond.max()};
+      const T y_max = (n - 1) * bond.max();
+      const libbear::range<T> y{-y_max, y_max};
       const libbear::range<T> dz{0., bond.max()};
       libbear::genotype res{libbear::gene{dz}};
       for (std::size_t i = 1; i < n; ++i) {
