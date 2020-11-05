@@ -119,7 +119,7 @@ namespace evenstar {
         boost::add_edge(i, j, g);
       }
     }
-    std::vector<std::size_t> c{boost::num_vertices(g)};
+    std::vector<std::size_t> c(boost::num_vertices(g)); // And here.
     return 1 == boost::connected_components(g, c.data());
   }
 
