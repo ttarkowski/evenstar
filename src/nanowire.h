@@ -10,6 +10,8 @@
 #include <string>
 #include <tuple>
 #include <vector>
+#include <boost/graph/adjacency_matrix.hpp>
+#include <boost/graph/connected_components.hpp>
 #include <libbear/core/coordinates.h>
 #include <libbear/core/range.h>
 #include <libbear/ea/genotype.h>
@@ -109,19 +111,16 @@ namespace evenstar {
   // This function template checks if all atoms are connected, i.e. form a wire.
   template<std::floating_point T>
   bool all_atoms_connected(const pwx_positions& ps, T max_distance) {
-    pwx_positions connected{};
-    for (const auto& x : ps) {
-      if (std::ranges::any_of(connected,
-                              [&x, max_distance](const auto& y) {
-                                return x.distance(y) <= max_distance;
-                              }) || connected.size() == 0) {
-        connected.push_back(x);
-      } else {
-        return false;
+    boost::adjacency_matrix<boost::undirectedS> g{ps.size()};
+    std::vector<std::size_t> v{ps.size()};
+    std::iota(v.begin(), v.end(), 0);
+    for (auto [i, j] : detail::mystic_rose_edges(v)) {
+      if (ps[i].distance(ps[j]) <= max_distance) {
+        boost::add_edge(i, j, g);
       }
     }
-    assert(connected.size() == ps.size());
-    return true;
+    std::vector<std::size_t> c{boost::num_vertices(g)};
+    return 1 == boost::connected_components(g, &c[0]);
   }
 
   pwx_positions adjust_positions(const pwx_positions& ps);
