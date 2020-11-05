@@ -120,7 +120,7 @@ namespace evenstar {
       }
     }
     std::vector<std::size_t> c{boost::num_vertices(g)};
-    return 1 == boost::connected_components(g, &c[0]);
+    return 1 == boost::connected_components(g, c.data());
   }
 
   pwx_positions adjust_positions(const pwx_positions& ps);
