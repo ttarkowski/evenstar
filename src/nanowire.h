@@ -112,7 +112,7 @@ namespace evenstar {
   template<std::floating_point T>
   bool all_atoms_connected(const pwx_positions& ps, T max_distance) {
     boost::adjacency_matrix<boost::undirectedS> g{ps.size()};
-    std::vector<std::size_t> v{ps.size()};
+    std::vector<std::size_t> v(ps.size()); // Do not use {...} here!
     std::iota(v.begin(), v.end(), 0);
     for (auto [i, j] : detail::mystic_rose_edges(v)) {
       if (ps[i].distance(ps[j]) <= max_distance) {
