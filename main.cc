@@ -34,21 +34,21 @@ namespace {
     const auto [p, h] = geometry<T>(g, atom.symbol, flat);
     const auto max_x = std::ranges::max_element(p, {}, &pwx_position::x)->x;
     const auto max_y = std::ranges::max_element(p, {}, &pwx_position::y)->y;
-    // With electron_maxstep == 25 about 5% of SCF calculations will not finish.
+    const T free_space = 10.;
     file << pwx_control(filename)
-         << pwx_system(number_of_atoms(g, flat), 1, 0., 5.e-3, 6.e+1)
-         << pwx_electrons(25, 7.e-1)
-         << pwx_cell_parameters_diag(max_x + 15., max_y + 15., h)
+         << pwx_system(number_of_atoms(g, flat), 1, 0., 1.e-2, 6.e+1)
+         << pwx_electrons(100, 7.e-1)
+         << pwx_cell_parameters_diag(max_x + free_space, max_y + free_space, h)
          << pwx_atomic_species({atom})
          << pwx_atomic_positions(p)
-         << pwx_k_points(4);
+         << pwx_k_points(8);
   }
 
 }
 
 int main() {
   using type = double;
-  const pwx_atom atom{"B11", 11.009305, "B.pbesol-n-kjpaw_psl.0.1.UPF"};
+  const pwx_atom atom{"B", 10.811, "B.pbe-n-kjpaw_psl.1.0.0.UPF"};
   execute("/bin/bash download.sh " + atom.pp);
 
   const bool flat = false;

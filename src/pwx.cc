@@ -111,7 +111,7 @@ evenstar::
 pwx_k_points(int k) {
   std::ostringstream oss{};
   oss << "K_POINTS automatic\n"
-      << k << " 1 1 1 1 0\n";
+      << "1 1 " << k << " 0 0 1\n";
   return oss.str();
 }
 
