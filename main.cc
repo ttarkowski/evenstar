@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <iomanip>
 #include <ios>
+#include <mutex>
 #include <fstream>
 #include <unordered_map>
 #include <libbear/core/coordinates.h>
@@ -23,13 +24,19 @@ using namespace evenstar;
 namespace {
 
   std::unordered_map<genotype, std::string> file_db{};
+  std::mutex file_db_mutex{};
+
+  void update_file_db(const genotype& g, const std::string& filename) {
+    const std::lock_guard<std::mutex> lg{file_db_mutex};
+    file_db[g] = filename;
+  }
 
   template<std::floating_point T>
   void input_file(const std::string& filename,
                   const genotype& g,
                   const pwx_atom& atom,
                   bool flat) {
-    file_db[g] = filename;
+    update_file_db(g, filename);
     std::ofstream file{filename};
     const auto [p, h] = geometry<T>(g, atom.symbol, flat);
     const auto max_x = std::ranges::max_element(p, {}, &pwx_position::x)->x;
