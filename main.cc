@@ -1,11 +1,14 @@
 #include <algorithm>
 #include <cassert>
+#include <cctype>
 #include <concepts>
 #include <cstddef>
 #include <iomanip>
 #include <ios>
 #include <mutex>
 #include <fstream>
+#include <stdexcept>
+#include <string>
 #include <sstream>
 #include <tuple>
 #include <unordered_map>
@@ -59,9 +62,14 @@ namespace {
     std::istringstream iss2{argv[2]};
     std::size_t cell_atoms;
     iss1 >> cell_atoms;
-    char c;
-    iss2 >> c;
-    const bool flat = c == 'f'? false : true;
+    std::string s;
+    iss2 >> s;
+    std::transform(s.begin(), s.end(), s.begin(),
+                   [](auto c) { return std::tolower(c); });
+    if (s != "flat" && s != "buckled") {
+      throw std::invalid_argument{"main_args: bad args"};
+    }
+    const bool flat = s == "flat"? true : false;
     return std::make_tuple(flat, cell_atoms);
   }
 
