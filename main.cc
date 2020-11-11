@@ -1,10 +1,13 @@
 #include <algorithm>
+#include <cassert>
 #include <concepts>
 #include <cstddef>
 #include <iomanip>
 #include <ios>
 #include <mutex>
 #include <fstream>
+#include <sstream>
+#include <tuple>
 #include <unordered_map>
 #include <libbear/core/coordinates.h>
 #include <libbear/core/range.h>
@@ -51,15 +54,26 @@ namespace {
          << pwx_k_points(8);
   }
 
+  std::tuple<bool, std::size_t> main_args(char* argv[]) {
+    std::istringstream iss1{argv[1]};
+    std::istringstream iss2{argv[2]};
+    std::size_t cell_atoms;
+    iss1 >> cell_atoms;
+    char c;
+    iss2 >> c;
+    const bool flat = c == 'f'? false : true;
+    return std::make_tuple(flat, cell_atoms);
+  }
+
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  assert(argc == 3);
   using type = double;
   const pwx_atom atom{"B", 10.811, "B.pbe-n-kjpaw_psl.1.0.0.UPF"};
   execute("/bin/bash download.sh " + atom.pp);
 
-  const bool flat = false;
-  const std::size_t cell_atoms = 3;
+  const auto [flat, cell_atoms] = main_args(argv);
   const range<type> bond_range{0.5, 2.5}; // Angstrom
   const genotype g{nanowire<type>(cell_atoms, bond_range, flat)};
 
@@ -70,7 +84,7 @@ int main() {
            && all_atoms_connected(ps, bond_range.max());
   };
 
-  const auto f = [atom](const genotype& g) -> fitness {
+  const auto f = [atom, flat](const genotype& g) -> fitness {
     const std::string input_filename{pwx_unique_filename()};
     input_file<type>(input_filename, g, atom, flat);
     const auto [o, e] = execute("/bin/bash calc.sh " + input_filename);

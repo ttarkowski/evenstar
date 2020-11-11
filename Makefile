@@ -17,14 +17,16 @@ $(TARGET): $(OBJECTS)
 %.o : %.cc
 	$(CXX) $(CXXFLAGS) -MMD -c $< -o $@
 
+# Example:
+#   make ARGS="3 f" run
 run:
-	LD_LIBRARY_PATH=../libbear/:$LD_LIBRARY_PATH ./$(TARGET)
+	LD_LIBRARY_PATH=../libbear/:$LD_LIBRARY_PATH ./$(TARGET) $(ARGS)
 
 check:
 	LD_LIBRARY_PATH=../libbear/:$LD_LIBRARY_PATH \
 	valgrind --leak-check=full --show-leak-kinds=all \
 	--errors-for-leak-kinds=all --run-cxx-freeres=yes \
-	./$(TARGET)
+	./$(TARGET) $(ARGS)
 
 .PHONY: clean
 clean:
