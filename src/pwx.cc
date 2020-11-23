@@ -29,7 +29,7 @@ pwx_control(const std::string& outdir_postfix) {
   oss << "&CONTROL\n"
       << "calculation = 'scf'\n"
       << "prefix = 'dft'\n"
-      << "pseudo_dir = './'\n"
+      << "pseudo_dir = '../pp-files/'\n"
       << "outdir = 'results-" << outdir_postfix << "'\n"
       << "/\n";
   return oss.str();

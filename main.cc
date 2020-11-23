@@ -79,7 +79,6 @@ int main(int argc, char* argv[]) {
   assert(argc == 3);
   using type = double;
   const pwx_atom atom{"B", 10.811, "B.pbe-n-kjpaw_psl.1.0.0.UPF"};
-  execute("/bin/bash download.sh " + atom.pp);
 
   const auto [flat, cell_atoms] = main_args(argv);
   const range<type> bond_range{0.5, 2.5}; // Angstrom
